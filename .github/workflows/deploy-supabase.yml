@@ -70,6 +70,30 @@ jobs:
           run "supabase link" supabase link --project-ref "$SUPABASE_PROJECT_REF"
           run "supabase db push" supabase db push --include-all
 
+      - name: Configure sign-in redirect URLs
+        if: steps.check.outputs.ready == 'true'
+        env:
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+        run: |
+          # Google sign-in returns users to the Site URL / allow-listed URLs, so point them at GitHub Pages.
+          site="https://$(echo "$OWNER" | tr '[:upper:]' '[:lower:]').github.io/${REPO}/"
+          api="https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/config/auth"
+          current="$(curl -fsS -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" "$api")" || {
+            echo "::error title=Read auth config failed::Could not read the Supabase auth settings. Check that SUPABASE_ACCESS_TOKEN is valid."; exit 1; }
+          allow="$(echo "$current" | jq -r --arg a "${site}**" --arg b "$site" '
+            [(.uri_allow_list // "" | split(",")[] | gsub("^\\s+|\\s+$"; "") | select(. != "" and (test("localhost") | not))), $a, $b]
+            | unique | join(",")')"
+          body="$(jq -n --arg site "$site" --arg allow "$allow" '{site_url: $site, uri_allow_list: $allow}')"
+          result="$(curl -sS -X PATCH -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" -H "Content-Type: application/json" -d "$body" "$api")"
+          saved_site="$(echo "$result" | jq -r '.site_url // empty')"
+          if [ "$saved_site" != "$site" ]; then
+            echo "::error title=Update auth config failed::$(echo "$result" | head -c 500)"
+            exit 1
+          fi
+          google="$(echo "$result" | jq -r '.external_google_enabled')"
+          echo "::notice title=Sign-in settings::Site URL = ${saved_site} | Redirect URLs = $(echo "$result" | jq -r '.uri_allow_list') | Google provider enabled = ${google}"
+
       - name: Set function secrets
         if: steps.check.outputs.ready == 'true' && env.LLM_API_KEY != ''
         run: |
