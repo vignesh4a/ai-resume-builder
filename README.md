@@ -1,6 +1,6 @@
 # AI Resume Builder
 
-Sign in with Google, paste your background and a job requirement, and get a resume tailored to that job. The resume is written by an **open-source LLM** (Meta Llama) and saved in an **open-source database** (Postgres on Supabase). Everything runs on free tiers.
+Sign in with Google, paste your background and a job requirement, and get a resume tailored to that job. The resume is written by an **open-source LLM** (default: gpt-oss-120b) (Meta Llama) and saved in an **open-source database** (Postgres on Supabase). Everything runs on free tiers.
 
 **Live site:** https://vignesh4a.github.io/ai-resume-builder/
 
@@ -18,7 +18,7 @@ Supabase (free tier, open source)
           │  holds the LLM API key server-side
           ▼
    Open-source LLM over an OpenAI-compatible API
-   (default: Llama 3.3 70B on Groq's free tier)
+   (default: openai/gpt-oss-120b, an Apache-2.0 open-weight model, on Groq's free tier)
 ```
 
 | Piece | Free service | Why |
@@ -26,7 +26,7 @@ Supabase (free tier, open source)
 | Hosting | GitHub Pages | Free static hosting with HTTPS |
 | Database + auth | [Supabase](https://supabase.com) (open-source Postgres) | 500 MB DB on the free tier, plus Row Level Security |
 | Server code | Supabase Edge Functions | Keeps the LLM key secret. 500k calls/month free |
-| LLM | Llama 3.3 70B via [Groq](https://console.groq.com) | Free API key with generous rate limits |
+| LLM | gpt-oss-120b (open-weight, Apache 2.0) via [Groq](https://console.groq.com) | Free API key with generous rate limits |
 
 Features:
 - Tailors your resume to a job description
@@ -71,9 +71,11 @@ Create a key at https://console.groq.com/keys.
 
 To use another provider, set the `LLM_BASE_URL` and `LLM_MODEL` variables:
 
+> If the configured model is retired by the provider, the function automatically switches to the best available open model (the deploy log says which models your key can use).
+
 | Provider | `LLM_BASE_URL` | Example `LLM_MODEL` |
 |---|---|---|
-| Groq (default) | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` |
+| Groq (default) | `https://api.groq.com/openai/v1` | `openai/gpt-oss-120b` (or `qwen/qwen3.8-27b`) |
 | OpenRouter (free models) | `https://openrouter.ai/api/v1` | `meta-llama/llama-3.3-70b-instruct:free` |
 | Hugging Face | `https://router.huggingface.co/v1` | `meta-llama/Llama-3.3-70B-Instruct` |
 | Self-hosted Ollama | `https://your-host/v1` | `llama3.1` |

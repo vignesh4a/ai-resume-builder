@@ -98,7 +98,7 @@ jobs:
         if: steps.check.outputs.ready == 'true' && env.LLM_API_KEY != ''
         run: |
           base="${LLM_BASE_URL:-https://api.groq.com/openai/v1}"
-          model="${LLM_MODEL:-llama-3.3-70b-versatile}"
+          model="${LLM_MODEL:-openai/gpt-oss-120b}"
           ids="$(curl -sS -H "Authorization: Bearer ${LLM_API_KEY}" "$base/models" | jq -r '[.data[]?.id] | sort | join(", ")' || true)"
           if [ -z "$ids" ]; then
             echo "::warning title=LLM check::Could not list models at $base - check that LLM_API_KEY belongs to this provider."

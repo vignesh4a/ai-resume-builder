@@ -1,10 +1,10 @@
 // Supabase Edge Function: turns a candidate's background + a job requirement
-// into a structured resume using an open-source LLM (Llama via any
+// into a structured resume using an open-weight LLM (gpt-oss, Llama, Qwen… via any
 // OpenAI-compatible endpoint: Groq, OpenRouter, Hugging Face router, Ollama...).
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
 const LLM_BASE_URL = Deno.env.get("LLM_BASE_URL") ?? "https://api.groq.com/openai/v1";
-const LLM_MODEL = Deno.env.get("LLM_MODEL") ?? "llama-3.3-70b-versatile";
+const LLM_MODEL = Deno.env.get("LLM_MODEL") ?? "openai/gpt-oss-120b";
 const LLM_API_KEY = Deno.env.get("LLM_API_KEY") ?? "";
 const HOURLY_LIMIT = Number(Deno.env.get("HOURLY_LIMIT") ?? "20");
 const MAX_INPUT_CHARS = 12000;
@@ -80,7 +80,7 @@ const PREFERRED_MODELS = [
   /llama-4-maverick/i, /llama-3\.3-70b/i, /gpt-oss-120b/i, /qwen3?-?.*(235b|72b|32b)/i, /llama-4-scout/i,
   /deepseek.*(v3|r1)/i, /llama-3\.1-70b/i, /gpt-oss-20b/i, /mistral|mixtral/i, /llama/i, /qwen|gemma/i,
 ];
-const NOT_CHAT = /guard|whisper|tts|embed|playai|orpheus|compound|prompt-guard|vision-only|moderation/i;
+const NOT_CHAT = /guard|safeguard|whisper|tts|embed|playai|orpheus|compound|prompt-guard|vision-only|moderation/i;
 
 // Model actually used; replaced at runtime if the configured one has been retired.
 let activeModel = LLM_MODEL;
@@ -108,7 +108,9 @@ function chatRequest(model: string, jsonMode: boolean, background: string, requi
     body: JSON.stringify({
       model,
       temperature: 0.3,
-      max_tokens: 4000,
+      max_tokens: 8000,
+      // Reasoning models spend tokens thinking first; keep that short so the resume isn't cut off.
+      ...(/gpt-oss/i.test(model) ? { reasoning_effort: "low" } : {}),
       ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
