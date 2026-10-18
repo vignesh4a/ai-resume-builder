@@ -32,10 +32,8 @@ jobs:
       - name: Check configuration
         id: check
         run: |
-          ref="$(echo "${SUPABASE_PROJECT_REF:-}" | tr -d '[:space:]')"
-          if [ -z "$ref" ] && [ -n "$SUPABASE_URL" ]; then
-            ref="$(echo "$SUPABASE_URL" | sed -E 's#^https?://([a-z0-9]+)\.supabase\.co.*#\1#')"
-          fi
+          # Accept a bare ref, a project URL or a dashboard URL: the ref is the 20-letter ID in it.
+          ref="$(echo "${SUPABASE_PROJECT_REF:-} ${SUPABASE_URL:-}" | grep -oE '\b[a-z]{20}\b' | head -1 || true)"
           missing=""
           [ -z "$SUPABASE_ACCESS_TOKEN" ] && missing="$missing SUPABASE_ACCESS_TOKEN(secret)"
           [ -z "$SUPABASE_DB_PASSWORD" ] && missing="$missing SUPABASE_DB_PASSWORD(secret)"

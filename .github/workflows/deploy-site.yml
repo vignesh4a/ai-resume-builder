@@ -36,7 +36,27 @@ jobs:
         env:
           SUPABASE_URL: ${{ vars.SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF || secrets.SUPABASE_PROJECT_REF }}
         run: |
+          # The site needs the API URL (https://<ref>.supabase.co), not a dashboard link.
+          SUPABASE_URL="$(echo "${SUPABASE_URL:-}" | tr -d '[:space:]')"
+          SUPABASE_ANON_KEY="$(echo "${SUPABASE_ANON_KEY:-}" | tr -d '[:space:]')"
+          if ! echo "$SUPABASE_URL" | grep -qE '^https://[a-z0-9]+\.supabase\.co/?$'; then
+            ref="$(echo "$SUPABASE_URL ${SUPABASE_PROJECT_REF:-}" | grep -oE '\b[a-z]{20}\b' | head -1 || true)"
+            if [ -n "$ref" ]; then
+              echo "::warning::SUPABASE_URL should look like https://<ref>.supabase.co - using https://$ref.supabase.co"
+              SUPABASE_URL="https://$ref.supabase.co"
+            fi
+          fi
+          SUPABASE_URL="${SUPABASE_URL%/}"
+          if [ -n "$SUPABASE_ANON_KEY" ] && ! echo "$SUPABASE_ANON_KEY" | grep -qE '^(eyJ|sb_publishable_)'; then
+            echo "::warning::SUPABASE_ANON_KEY doesn't look like an anon/publishable key (should start with eyJ or sb_publishable_)."
+          fi
+          payload="$(echo "$SUPABASE_ANON_KEY" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null || true)"
+          if echo "$SUPABASE_ANON_KEY" | grep -q '^sb_secret_' || echo "$payload" | grep -q '"role":"service_role"'; then
+            echo "::error::SUPABASE_ANON_KEY is a SECRET key. Never put it in a website - use the anon / publishable key."
+            exit 1
+          fi
           [ -z "$SUPABASE_URL" ] && echo "::warning::SUPABASE_URL variable is empty - the site will show a setup banner."
           [ -z "$SUPABASE_ANON_KEY" ] && echo "::warning::SUPABASE_ANON_KEY variable is empty - the site will show a setup banner."
           cat > web/config.js <<EOF
