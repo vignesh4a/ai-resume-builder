@@ -94,6 +94,20 @@ jobs:
           google="$(echo "$result" | jq -r '.external_google_enabled')"
           echo "::notice title=Sign-in settings::Site URL = ${saved_site} | Redirect URLs = $(echo "$result" | jq -r '.uri_allow_list') | Google provider enabled = ${google}"
 
+      - name: Check the LLM model
+        if: steps.check.outputs.ready == 'true' && env.LLM_API_KEY != ''
+        run: |
+          base="${LLM_BASE_URL:-https://api.groq.com/openai/v1}"
+          model="${LLM_MODEL:-llama-3.3-70b-versatile}"
+          ids="$(curl -sS -H "Authorization: Bearer ${LLM_API_KEY}" "$base/models" | jq -r '[.data[]?.id] | sort | join(", ")' || true)"
+          if [ -z "$ids" ]; then
+            echo "::warning title=LLM check::Could not list models at $base - check that LLM_API_KEY belongs to this provider."
+          elif echo ", $ids," | grep -q ", $model,"; then
+            echo "::notice title=LLM check::Model $model is available."
+          else
+            echo "::warning title=LLM check::Model $model is not offered by $base; the function will pick another automatically. Available: $ids"
+          fi
+
       - name: Set function secrets
         if: steps.check.outputs.ready == 'true' && env.LLM_API_KEY != ''
         run: |

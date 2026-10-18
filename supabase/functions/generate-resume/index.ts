@@ -75,15 +75,41 @@ function extractJson(text: string): Record<string, unknown> {
   }
 }
 
-async function callLlm(background: string, requirement: string, sections: Section[]) {
-  const res = await fetch(`${LLM_BASE_URL}/chat/completions`, {
+// Open-weight models in rough order of preference for resume writing.
+const PREFERRED_MODELS = [
+  /llama-4-maverick/i, /llama-3\.3-70b/i, /gpt-oss-120b/i, /qwen3?-?.*(235b|72b|32b)/i, /llama-4-scout/i,
+  /deepseek.*(v3|r1)/i, /llama-3\.1-70b/i, /gpt-oss-20b/i, /mistral|mixtral/i, /llama/i, /qwen|gemma/i,
+];
+const NOT_CHAT = /guard|whisper|tts|embed|playai|orpheus|compound|prompt-guard|vision-only|moderation/i;
+
+// Model actually used; replaced at runtime if the configured one has been retired.
+let activeModel = LLM_MODEL;
+
+async function availableModels(): Promise<string[]> {
+  const res = await fetch(`${LLM_BASE_URL}/models`, { headers: { Authorization: `Bearer ${LLM_API_KEY}` } });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.data ?? []).map((m: { id: string }) => m.id).filter((id: string) => !NOT_CHAT.test(id));
+}
+
+async function pickFallbackModel(): Promise<string | null> {
+  const ids = await availableModels();
+  for (const re of PREFERRED_MODELS) {
+    const hit = ids.find((id) => re.test(id));
+    if (hit) return hit;
+  }
+  return ids[0] ?? null;
+}
+
+function chatRequest(model: string, jsonMode: boolean, background: string, requirement: string, sections: Section[]) {
+  return fetch(`${LLM_BASE_URL}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${LLM_API_KEY}` },
     body: JSON.stringify({
-      model: LLM_MODEL,
+      model,
       temperature: 0.3,
       max_tokens: 4000,
-      response_format: { type: "json_object" },
+      ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         {
@@ -93,12 +119,34 @@ async function callLlm(background: string, requirement: string, sections: Sectio
       ],
     }),
   });
-  if (!res.ok) {
+}
+
+async function callLlm(background: string, requirement: string, sections: Section[]) {
+  let jsonMode = true;
+  let switchedModel = false;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await chatRequest(activeModel, jsonMode, background, requirement, sections);
+    if (res.ok) {
+      const data = await res.json();
+      return extractJson(data.choices?.[0]?.message?.content ?? "");
+    }
     const detail = await res.text();
+    if (!switchedModel && /model_not_found|does not exist|decommissioned|deprecated|not supported|no such model|invalid model/i.test(detail)) {
+      const fallback = await pickFallbackModel();
+      if (fallback && fallback !== activeModel) {
+        console.warn(`Model ${activeModel} unavailable; switching to ${fallback}`);
+        activeModel = fallback;
+        switchedModel = true;
+        continue;
+      }
+    }
+    if (jsonMode && /response_format|json_object|json mode/i.test(detail)) {
+      jsonMode = false;
+      continue;
+    }
     throw new Error(`LLM request failed (${res.status}): ${detail.slice(0, 300)}`);
   }
-  const data = await res.json();
-  return extractJson(data.choices?.[0]?.message?.content ?? "");
+  throw new Error("LLM request failed after retries.");
 }
 
 Deno.serve(async (req) => {
@@ -143,7 +191,7 @@ Deno.serve(async (req) => {
         requirement,
         background,
         content,
-        model: LLM_MODEL,
+        model: activeModel,
         template: typeof template === "string" ? template.slice(0, 20) : "classic",
         format: format && typeof format === "object" ? { ...format, sections } : null,
       })
