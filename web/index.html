@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Resume Builder</title>
+  <meta name="description" content="Paste a job requirement and get a tailored resume instantly, written by open-source LLMs.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="config.js"></script>
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header class="topbar no-print">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">R</span>
+      <span>AI Resume Builder</span>
+    </div>
+    <div class="account">
+      <span id="account-label" class="muted">Connecting…</span>
+      <button id="account-btn" class="btn ghost" hidden>Save with email</button>
+      <button id="signout-btn" class="btn ghost" hidden>Sign out</button>
+    </div>
+  </header>
+
+  <div id="setup-banner" class="banner no-print" hidden>
+    This site is not connected to Supabase yet. Set the <code>SUPABASE_URL</code> and
+    <code>SUPABASE_ANON_KEY</code> repository variables and re-run the deploy workflow (see README).
+  </div>
+
+  <main class="layout">
+    <section class="panel no-print">
+      <form id="resume-form">
+        <label for="background">
+          <span class="label">1. About you</span>
+          <span class="hint">Paste your experience, education, skills, projects and contact details — an old resume or LinkedIn summary works. Saved for next time.</span>
+        </label>
+        <textarea id="background" rows="10" required minlength="30" maxlength="12000"
+          placeholder="Jane Doe · jane@email.com · Bengaluru&#10;Software Engineer at Acme (2021–present): built payment APIs in Java/Spring, cut latency 40%…&#10;B.Tech CSE, VIT 2021…"></textarea>
+
+        <label for="requirement">
+          <span class="label">2. Job requirement</span>
+          <span class="hint">Paste the job description you're applying for.</span>
+        </label>
+        <textarea id="requirement" rows="8" required minlength="20" maxlength="12000"
+          placeholder="We're hiring a Backend Engineer with 3+ years of Java, microservices, AWS…"></textarea>
+
+        <div class="row">
+          <label class="grow">
+            <span class="label small">Resume title (optional)</span>
+            <input id="title" type="text" maxlength="120" placeholder="Backend Engineer – Acme">
+          </label>
+          <label>
+            <span class="label small">Template</span>
+            <select id="template">
+              <option value="classic">Classic</option>
+              <option value="modern">Modern</option>
+            </select>
+          </label>
+        </div>
+
+        <button id="generate-btn" class="btn primary" type="submit">Generate resume</button>
+        <p id="status" class="status" role="status"></p>
+      </form>
+
+      <div class="history">
+        <h2>My resumes</h2>
+        <ul id="history-list"><li class="muted">Nothing yet.</li></ul>
+      </div>
+    </section>
+
+    <section class="preview-col">
+      <div class="toolbar no-print">
+        <span class="muted">Preview — click any text to tweak it before downloading.</span>
+        <div class="toolbar-actions">
+          <button id="copy-btn" class="btn ghost" disabled>Copy text</button>
+          <button id="print-btn" class="btn" disabled>Download PDF</button>
+        </div>
+      </div>
+
+      <div id="match" class="match no-print" hidden></div>
+
+      <article id="resume" class="resume classic">
+        <div class="empty">
+          <p>Your tailored resume will appear here.</p>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <dialog id="email-dialog" class="no-print">
+    <form method="dialog" id="email-form">
+      <h3 id="email-title">Save your resumes with email</h3>
+      <p class="muted" id="email-hint">We'll email you a link. Your resumes then follow you to any device.</p>
+      <input id="email-input" type="email" required placeholder="you@example.com">
+      <div class="row end">
+        <button value="cancel" formnovalidate class="btn ghost">Cancel</button>
+        <button value="ok" class="btn primary">Send link</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>

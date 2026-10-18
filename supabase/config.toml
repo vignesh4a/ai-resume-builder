@@ -1,0 +1,7 @@
+project_id = "ai-resume-builder"
+
+[auth]
+enable_anonymous_sign_ins = true
+
+[functions.generate-resume]
+verify_jwt = true
