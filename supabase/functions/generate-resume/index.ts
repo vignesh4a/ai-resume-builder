@@ -36,11 +36,33 @@ Respond with a single JSON object and nothing else, matching exactly this shape:
   "projects": [{ "name": string, "description": string, "bullets": string[] }],
   "education": [{ "degree": string, "institution": string, "year": string, "details": string }],
   "certifications": string[],
+  "custom_sections": [{ "heading": string, "bullets": string[] }],
   "match": { "score": number, "matched_keywords": string[], "missing_keywords": string[], "tips": string[] }
 }
 Use empty strings or empty arrays for anything not present in the background.
 "match.score" is 0-100: how well the candidate fits the requirement.
-"missing_keywords" lists important requirement keywords the background does not support.`;
+"missing_keywords" lists important requirement keywords the background does not support.
+"custom_sections" holds any other sections from the background (Awards, Languages, Publications…).`;
+
+type Section = { key: string; heading: string };
+const STANDARD_KEYS = ["summary", "skills", "experience", "projects", "education", "certifications"];
+
+// Sanitises the layout detected from the user's uploaded resume.
+function cleanSections(format: unknown): Section[] {
+  const list = (format as { sections?: unknown })?.sections;
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((s): s is Section => typeof s?.key === "string" && typeof s?.heading === "string")
+    .slice(0, 15)
+    .map((s) => ({ key: s.key.slice(0, 20), heading: s.heading.slice(0, 60) }));
+}
+
+function layoutInstruction(sections: Section[]) {
+  if (!sections.length) return "";
+  const list = sections.map((s, i) =>
+    `${i + 1}. "${s.heading}" -> ${STANDARD_KEYS.includes(s.key) ? `"${s.key}"` : '"custom_sections"'}`).join("\n");
+  return `\n\nLAYOUT: The candidate's existing resume uses these sections, in this order. Keep the same sections and fill them into the JSON keys shown; put every section marked custom_sections into "custom_sections" using its exact heading:\n${list}`;
+}
 
 function extractJson(text: string): Record<string, unknown> {
   try {
@@ -53,7 +75,7 @@ function extractJson(text: string): Record<string, unknown> {
   }
 }
 
-async function callLlm(background: string, requirement: string) {
+async function callLlm(background: string, requirement: string, sections: Section[]) {
   const res = await fetch(`${LLM_BASE_URL}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${LLM_API_KEY}` },
@@ -66,7 +88,7 @@ async function callLlm(background: string, requirement: string) {
         { role: "system", content: SYSTEM_PROMPT },
         {
           role: "user",
-          content: `TARGET JOB REQUIREMENT:\n${requirement}\n\nCANDIDATE BACKGROUND:\n${background}`,
+          content: `TARGET JOB REQUIREMENT:\n${requirement}\n\nCANDIDATE BACKGROUND:\n${background}${layoutInstruction(sections)}`,
         },
       ],
     }),
@@ -92,7 +114,8 @@ Deno.serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user || user.is_anonymous) return json({ error: "Please sign in with Google first." }, 401);
 
-    const { background, requirement, title } = await req.json();
+    const { background, requirement, title, template, format } = await req.json();
+    const sections = cleanSections(format);
     if (typeof background !== "string" || typeof requirement !== "string" ||
         background.trim().length < 30 || requirement.trim().length < 20) {
       return json({ error: "Please provide your background and the job requirement in more detail." }, 400);
@@ -111,7 +134,7 @@ Deno.serve(async (req) => {
       return json({ error: "Hourly limit reached. Please try again later." }, 429);
     }
 
-    const content = await callLlm(background, requirement);
+    const content = await callLlm(background, requirement, sections);
 
     const { data: saved, error } = await supabase
       .from("resumes")
@@ -121,6 +144,8 @@ Deno.serve(async (req) => {
         background,
         content,
         model: LLM_MODEL,
+        template: typeof template === "string" ? template.slice(0, 20) : "classic",
+        format: format && typeof format === "object" ? { ...format, sections } : null,
       })
       .select()
       .single();

@@ -39,6 +39,10 @@ Features:
 - Your background and job requirement drafts autosave to your account
 - Dashboard with stats, live progress while generating, toasts, searchable resume library
 - Keyboard shortcut: Ctrl/Cmd + Enter to generate
+- **Upload your existing resume** (PDF, DOCX or TXT): text is extracted in the browser and its format
+  (font, sizes, heading colour, name alignment, section order and headings) is reused via the **My format** template.
+  The original file is kept in a private Supabase Storage bucket (`resume-uploads/<user id>/`).
+- **Download as PDF or Word (.docx)**: both are real-text documents (ATS-friendly) built from the preview, including your edits.
 
 ## One-time setup (about 10 minutes)
 
@@ -75,6 +79,9 @@ To use another provider, set the `LLM_BASE_URL` and `LLM_MODEL` variables:
 | Self-hosted Ollama | `https://your-host/v1` | `llama3.1` |
 
 ### 3. Add the values to this GitHub repository
+> Use the **Repository** sections (not Environment, Codespaces or Dependabot). The deploy logs print
+> "Repository/org variables visible: …" so you can confirm the variables are picked up.
+
 Go to **Settings → Secrets and variables → Actions**.
 
 **Secrets:**

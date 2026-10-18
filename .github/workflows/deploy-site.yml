@@ -24,6 +24,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: List variable names visible to this workflow
+        env:
+          VARS_JSON: ${{ toJSON(vars) }}
+        run: |
+          names="$(echo "$VARS_JSON" | jq -r 'keys | join(", ")')"
+          echo "Repository/org variables visible: ${names:-<none>}"
+          [ -z "$names" ] && echo "::warning::No Actions variables are visible. Add them under Settings > Secrets and variables > Actions > Variables tab > Repository variables." || true
+
       - name: Write public Supabase config
         env:
           SUPABASE_URL: ${{ vars.SUPABASE_URL || secrets.SUPABASE_URL }}

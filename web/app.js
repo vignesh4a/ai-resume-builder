@@ -1,4 +1,6 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
+import { importResume } from "./lib/importer.js";
+import { resolveStyle, readResumeDom, fileBaseName, downloadPdf, downloadDocx } from "./lib/exporter.js";
 
 const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.APP_CONFIG || {};
 const $ = (id) => document.getElementById(id);
@@ -27,7 +29,11 @@ const els = {
   loadingMsg: $("loading-msg"),
   progressBar: $("progress-bar"),
   copy: $("copy-btn"),
-  print: $("print-btn"),
+  pdf: $("pdf-btn"),
+  docx: $("docx-btn"),
+  drop: $("dropzone"),
+  fileInput: $("file-input"),
+  formatCard: $("format-card"),
   regen: $("regen-btn"),
   grid: $("library-grid"),
   search: $("search"),
@@ -55,6 +61,9 @@ let currentUser = null;
 let profile = null;
 let resumes = [];
 let currentTemplate = "classic";
+// Format detected from the user's uploaded resume, and the one used by the resume on screen.
+let uploadFormat = null;
+let activeFormat = null;
 
 // ---------- Helpers ----------
 
@@ -155,6 +164,11 @@ async function enterApp(user) {
 
   renderUser();
   if (profile?.background) els.background.value = profile.background;
+  if (profile?.resume_format) {
+    uploadFormat = profile.resume_format;
+    renderFormatCard();
+    setTemplate("upload");
+  }
   if (profile?.draft_requirement) els.requirement.value = profile.draft_requirement;
   updateCounts();
   await loadLibrary();
@@ -299,13 +313,124 @@ document.addEventListener("keydown", (e) => {
 // ---------- Templates ----------
 
 function setTemplate(name) {
+  if (name === "upload" && !(activeFormat || uploadFormat)) name = "classic";
   currentTemplate = name;
-  els.resume.classList.remove("classic", "modern", "minimal");
+  els.resume.classList.remove("classic", "modern", "minimal", "upload");
   els.resume.classList.add(name);
+  applyUploadStyle();
   $$(".seg button").forEach((b) => b.classList.toggle("active", b.dataset.tpl === name));
   $$('input[name="template"]').forEach((r) => (r.checked = r.value === name));
 }
 $$(".seg button").forEach((b) => b.addEventListener("click", () => setTemplate(b.dataset.tpl)));
+
+// Mirror the uploaded resume's look (font, sizes, colours, alignment) in the preview.
+function applyUploadStyle() {
+  const r = els.resume.style;
+  if (currentTemplate !== "upload") {
+    for (const v of ["--u-font", "--u-size", "--u-name", "--u-head", "--u-accent", "--u-name-color", "--u-align", "--u-case", "--u-rule"]) r.removeProperty(v);
+    return;
+  }
+  const st = resolveStyle("upload", activeFormat || uploadFormat);
+  r.setProperty("--u-font", `"${st.font}", ${st.serif ? '"Times New Roman", Georgia, serif' : '"Carlito", Arial, sans-serif'}`);
+  r.setProperty("--u-size", `${st.bodySize}pt`);
+  r.setProperty("--u-name", `${st.nameSize}pt`);
+  r.setProperty("--u-head", `${st.headingSize}pt`);
+  r.setProperty("--u-accent", st.accent);
+  r.setProperty("--u-name-color", st.nameColor);
+  r.setProperty("--u-align", st.nameAlign);
+  r.setProperty("--u-case", st.headingUpper ? "uppercase" : "none");
+  r.setProperty("--u-rule", st.headingRule ? "1px solid" : "0 solid");
+}
+
+// ---------- Upload an existing resume ----------
+
+function renderFormatCard() {
+  const show = !!uploadFormat;
+  els.formatCard.hidden = !show;
+  $$(".js-upload-tpl").forEach((n) => (n.hidden = !show));
+  if (!show) return;
+  const f = uploadFormat;
+  $("format-file").textContent = f.filename || "your resume";
+  const bits = [
+    f.font ? `${f.font} ${f.bodySize ?? ""}pt`.trim() : null,
+    f.nameAlign === "center" ? "centred name" : "left-aligned name",
+    f.accent ? "accent colour" : null,
+    f.headingRule ? "underlined headings" : null,
+  ].filter(Boolean);
+  $("format-style").textContent = bits.join(" · ");
+  const list = $("format-sections");
+  list.replaceChildren();
+  for (const sct of f.sections || []) list.append(el("span", "chip neutral", sct.heading));
+  if (!f.sections?.length) list.append(el("span", "muted small", "No section headings detected; the standard order will be used."));
+}
+
+async function handleFile(file) {
+  if (!file) return;
+  els.drop.classList.add("busy");
+  $("drop-label").textContent = `Reading ${file.name}…`;
+  try {
+    const { text, format } = await importResume(file);
+    const current = els.background.value.trim();
+    if (current && current !== text && !confirm("Replace the text in step 1 with the content of this file?")) return;
+    els.background.value = text;
+    uploadFormat = format;
+    activeFormat = null;
+    renderFormatCard();
+    setTemplate("upload");
+    updateCounts();
+    toast(`Read ${file.name}: ${format.sections.length} sections found. Its format will be used.`, "success");
+
+    // Keep the original file and detected format with the user's account.
+    const safe = file.name.replace(/[^\w.-]+/g, "_").slice(-80);
+    const path = `${currentUser.id}/${Date.now()}-${safe}`;
+    const { error: upErr } = await supabase.storage.from("resume-uploads").upload(path, file, { upsert: false });
+    if (upErr) console.warn("upload failed", upErr);
+    const { error } = await supabase.from("profiles").upsert({
+      user_id: currentUser.id,
+      background: text,
+      resume_format: format,
+      source_file_path: upErr ? null : path,
+      source_file_name: file.name,
+      updated_at: new Date().toISOString(),
+    });
+    els.saveState.textContent = error ? "Not saved" : "Saved ✓";
+  } catch (err) {
+    toast(err.message || "Could not read that file.", "error");
+  } finally {
+    els.drop.classList.remove("busy", "over");
+    $("drop-label").textContent = "Upload your existing resume";
+    els.fileInput.value = "";
+  }
+}
+
+els.drop.addEventListener("click", () => els.fileInput.click());
+els.drop.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    els.fileInput.click();
+  }
+});
+els.fileInput.addEventListener("change", () => handleFile(els.fileInput.files[0]));
+for (const ev of ["dragenter", "dragover"]) {
+  els.drop.addEventListener(ev, (e) => {
+    e.preventDefault();
+    els.drop.classList.add("over");
+  });
+}
+els.drop.addEventListener("dragleave", () => els.drop.classList.remove("over"));
+els.drop.addEventListener("drop", (e) => {
+  e.preventDefault();
+  handleFile(e.dataTransfer.files[0]);
+});
+
+$("format-remove").addEventListener("click", async () => {
+  uploadFormat = null;
+  activeFormat = null;
+  renderFormatCard();
+  setTemplate("classic");
+  await supabase.from("profiles").upsert({ user_id: currentUser.id, resume_format: null, updated_at: new Date().toISOString() });
+  toast("Uploaded format removed. Using the Classic template.");
+});
 $$('input[name="template"]').forEach((r) => r.addEventListener("change", () => setTemplate(r.value)));
 
 // ---------- Generate ----------
@@ -355,10 +480,17 @@ async function generate() {
   }
 
   setLoading(true);
+  els.pdf.disabled = els.docx.disabled = true;
   if (window.innerWidth < 900) els.loading.scrollIntoView({ behavior: "smooth", block: "center" });
   try {
     const { data, error } = await supabase.functions.invoke("generate-resume", {
-      body: { background, requirement, title: els.title.value.trim() },
+      body: {
+        background,
+        requirement,
+        title: els.title.value.trim(),
+        template: currentTemplate,
+        format: uploadFormat,
+      },
     });
     if (error) {
       let message = error.message;
@@ -366,6 +498,7 @@ async function generate() {
       throw new Error(message);
     }
     els.progressBar.style.width = "100%";
+    activeFormat = uploadFormat;
     showResume(data.resume.content);
     resumes.unshift(data.resume);
     renderLibrary();
@@ -397,6 +530,111 @@ function bulletList(items) {
   return ul;
 }
 
+const DEFAULT_ORDER = ["summary", "skills", "experience", "projects", "education", "certifications"];
+const DEFAULT_HEADINGS = {
+  summary: "Summary", skills: "Skills", experience: "Experience",
+  projects: "Projects", education: "Education", certifications: "Certifications",
+};
+
+const SECTION_BUILDERS = {
+  summary: (r, h) => (r.summary ? section(h, el("p", null, str(r.summary))) : null),
+  skills: (r, h) => {
+    const skills = arr(r.skills);
+    if (!skills.length) return null;
+    const list = el("div", "r-skills");
+    for (const group of skills) {
+      const p = el("p");
+      if (typeof group === "string") {
+        p.textContent = group;
+      } else {
+        if (group.category) p.append(el("strong", null, `${str(group.category)}: `));
+        p.append(document.createTextNode(arr(group.items).map(str).join(", ")));
+      }
+      list.append(p);
+    }
+    return section(h, list);
+  },
+  experience: (r, h) => {
+    const exp = arr(r.experience);
+    if (!exp.length) return null;
+    return section(h, ...exp.map((job) => {
+      const item = el("div", "r-item");
+      const head = el("div", "r-item-head");
+      const left = el("div");
+      left.append(el("strong", null, str(job.role)));
+      const org = [job.company, job.location].map(str).filter(Boolean).join(" · ");
+      if (org) left.append(el("span", "r-org", org));
+      head.append(left, el("span", "r-dates", [job.start, job.end].map(str).filter(Boolean).join(" – ")));
+      item.append(head, bulletList(job.bullets));
+      return item;
+    }));
+  },
+  projects: (r, h) => {
+    const projects = arr(r.projects);
+    if (!projects.length) return null;
+    return section(h, ...projects.map((p) => {
+      const item = el("div", "r-item");
+      const head = el("div", "r-item-head");
+      head.append(el("strong", null, str(p.name)));
+      item.append(head);
+      if (p.description) item.append(el("p", null, str(p.description)));
+      item.append(bulletList(p.bullets));
+      return item;
+    }));
+  },
+  education: (r, h) => {
+    const edu = arr(r.education);
+    if (!edu.length) return null;
+    return section(h, ...edu.map((e) => {
+      const item = el("div", "r-item");
+      const head = el("div", "r-item-head");
+      const left = el("div");
+      left.append(el("strong", null, str(e.degree)));
+      if (e.institution) left.append(el("span", "r-org", str(e.institution)));
+      head.append(left, el("span", "r-dates", str(e.year)));
+      item.append(head);
+      if (e.details) item.append(el("p", null, str(e.details)));
+      return item;
+    }));
+  },
+  certifications: (r, h) => {
+    const certs = arr(r.certifications);
+    return certs.length ? section(h, bulletList(certs)) : null;
+  },
+};
+
+// Lays sections out in the uploaded resume's order and wording when we have it.
+function buildSections(r, layout) {
+  const nodes = [];
+  const usedKeys = new Set();
+  const customs = arr(r.custom_sections).filter((c) => c && c.heading);
+  const usedCustom = new Set();
+  const customNode = (c) => section(str(c.heading), bulletList(c.bullets || c.items));
+
+  for (const s of arr(layout)) {
+    if (SECTION_BUILDERS[s.key] && !usedKeys.has(s.key)) {
+      usedKeys.add(s.key);
+      const node = SECTION_BUILDERS[s.key](r, s.heading || DEFAULT_HEADINGS[s.key]);
+      if (node) nodes.push(node);
+    } else if (!SECTION_BUILDERS[s.key]) {
+      const match = customs.find((c, i) => !usedCustom.has(i) && str(c.heading).toLowerCase() === str(s.heading).toLowerCase());
+      if (match) {
+        usedCustom.add(customs.indexOf(match));
+        nodes.push(customNode(match));
+      }
+    }
+  }
+  for (const key of DEFAULT_ORDER) {
+    if (usedKeys.has(key)) continue;
+    const node = SECTION_BUILDERS[key](r, DEFAULT_HEADINGS[key]);
+    if (node) nodes.push(node);
+  }
+  customs.forEach((c, i) => {
+    if (!usedCustom.has(i)) nodes.push(customNode(c));
+  });
+  return nodes;
+}
+
 function showResume(r) {
   const root = els.resume;
   root.replaceChildren();
@@ -425,72 +663,7 @@ function showResume(r) {
   header.append(contact);
   root.append(header);
 
-  if (r.summary) root.append(section("Summary", el("p", null, str(r.summary))));
-
-  const skills = arr(r.skills);
-  if (skills.length) {
-    const list = el("div", "r-skills");
-    for (const group of skills) {
-      const p = el("p");
-      if (typeof group === "string") {
-        p.textContent = group;
-      } else {
-        if (group.category) p.append(el("strong", null, `${str(group.category)}: `));
-        p.append(document.createTextNode(arr(group.items).map(str).join(", ")));
-      }
-      list.append(p);
-    }
-    root.append(section("Skills", list));
-  }
-
-  const exp = arr(r.experience);
-  if (exp.length) {
-    const items = exp.map((job) => {
-      const item = el("div", "r-item");
-      const head = el("div", "r-item-head");
-      const left = el("div");
-      left.append(el("strong", null, str(job.role)));
-      const org = [job.company, job.location].map(str).filter(Boolean).join(" · ");
-      if (org) left.append(el("span", "r-org", org));
-      head.append(left, el("span", "r-dates", [job.start, job.end].map(str).filter(Boolean).join(" – ")));
-      item.append(head, bulletList(job.bullets));
-      return item;
-    });
-    root.append(section("Experience", ...items));
-  }
-
-  const projects = arr(r.projects);
-  if (projects.length) {
-    const items = projects.map((p) => {
-      const item = el("div", "r-item");
-      const head = el("div", "r-item-head");
-      head.append(el("strong", null, str(p.name)));
-      item.append(head);
-      if (p.description) item.append(el("p", null, str(p.description)));
-      item.append(bulletList(p.bullets));
-      return item;
-    });
-    root.append(section("Projects", ...items));
-  }
-
-  const edu = arr(r.education);
-  if (edu.length) {
-    const items = edu.map((e) => {
-      const item = el("div", "r-item");
-      const head = el("div", "r-item-head");
-      const left = el("div");
-      left.append(el("strong", null, str(e.degree)));
-      if (e.institution) left.append(el("span", "r-org", str(e.institution)));
-      head.append(left, el("span", "r-dates", str(e.year)));
-      item.append(head);
-      if (e.details) item.append(el("p", null, str(e.details)));
-      return item;
-    });
-    root.append(section("Education", ...items));
-  }
-
-  const certs = arr(r.certifications);
-  if (certs.length) root.append(section("Certifications", bulletList(certs)));
+  for (const node of buildSections(r, activeFormat?.sections)) root.append(node);
 
   root.contentEditable = "true";
   root.spellcheck = true;
@@ -498,7 +671,8 @@ function showResume(r) {
   void root.offsetWidth;
   root.classList.add("reveal");
   els.copy.disabled = false;
-  els.print.disabled = false;
+  els.pdf.disabled = false;
+  els.docx.disabled = false;
   els.regen.disabled = false;
   renderMatch(r.match);
 }
@@ -546,7 +720,26 @@ function renderMatch(m) {
   els.match.hidden = false;
 }
 
-els.print.addEventListener("click", () => window.print());
+async function exportAs(kind) {
+  const btn = kind === "pdf" ? els.pdf : els.docx;
+  btn.disabled = true;
+  btn.classList.add("busy");
+  try {
+    const model = readResumeDom(els.resume);
+    const style = resolveStyle(currentTemplate, activeFormat || uploadFormat);
+    const name = fileBaseName(model, els.title.value.trim());
+    await (kind === "pdf" ? downloadPdf : downloadDocx)(model, style, name);
+    toast(`Downloaded ${name}.${kind}`, "success");
+  } catch (err) {
+    console.error(err);
+    toast(`Could not create the ${kind.toUpperCase()} file: ${err.message}`, "error");
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove("busy");
+  }
+}
+els.pdf.addEventListener("click", () => exportAs("pdf"));
+els.docx.addEventListener("click", () => exportAs("docx"));
 
 els.copy.addEventListener("click", async () => {
   await navigator.clipboard.writeText(els.resume.innerText);
@@ -558,7 +751,7 @@ els.copy.addEventListener("click", async () => {
 async function loadLibrary() {
   const { data, error } = await supabase
     .from("resumes")
-    .select("id, title, created_at, content, requirement")
+    .select("id, title, created_at, content, requirement, template, format")
     .order("created_at", { ascending: false })
     .limit(100);
   if (error) {
@@ -616,6 +809,8 @@ function renderLibrary() {
       els.requirement.value = row.requirement;
       els.title.value = row.title;
       updateCounts();
+      activeFormat = row.format || null;
+      setTemplate(row.template || "classic");
       showResume(row.content);
       switchTab("create");
     });

@@ -60,8 +60,8 @@
       <h2>How it works</h2>
       <div class="cards3">
         <div class="card"><span class="num">1</span><h3>Sign in with Google</h3><p>One click. Your profile and every resume are saved to your account.</p></div>
-        <div class="card"><span class="num">2</span><h3>Paste the job</h3><p>Drop in any job description. We save your background so you only type it once.</p></div>
-        <div class="card"><span class="num">3</span><h3>Download &amp; apply</h3><p>Get a tailored resume, a match score and missing keywords, then download it as a PDF.</p></div>
+        <div class="card"><span class="num">2</span><h3>Upload &amp; paste the job</h3><p>Upload your current resume (we keep its look) and paste any job description.</p></div>
+        <div class="card"><span class="num">3</span><h3>Download &amp; apply</h3><p>Get a tailored resume, a match score and missing keywords, then download it as PDF or Word.</p></div>
       </div>
     </section>
 
@@ -113,9 +113,26 @@
               <span class="step-num">1</span>
               <div>
                 <h2>About you</h2>
-                <p class="hint">Experience, education, skills, projects and contact details. An old resume or LinkedIn "About" works.</p>
+                <p class="hint">Upload your current resume, or type/paste your experience, education, skills and contact details.</p>
               </div>
             </div>
+            <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Upload your existing resume">
+              <span class="drop-icon" aria-hidden="true">📎</span>
+              <span class="drop-text">
+                <strong id="drop-label">Upload your existing resume</strong>
+                <span class="muted small">PDF, Word (.docx) or TXT, up to 5 MB. Drag and drop or click. We'll keep its format.</span>
+              </span>
+              <input id="file-input" type="file" accept=".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" hidden>
+            </div>
+            <div id="format-card" class="format-card" hidden>
+              <div class="format-top">
+                <span>✅ Using the format of <strong id="format-file"></strong></span>
+                <button type="button" id="format-remove" class="link small">Remove</button>
+              </div>
+              <p id="format-style" class="muted small"></p>
+              <div id="format-sections" class="chips tight"></div>
+            </div>
+            <p class="or muted small"><span>or type it in</span></p>
             <textarea id="background" rows="9" maxlength="12000"
               placeholder="Jane Doe · jane@email.com · Bengaluru&#10;Software Engineer at Acme (2021–present): built payment APIs in Java/Spring, cut latency 40%…&#10;B.Tech CSE, VIT 2021…"></textarea>
             <div class="field-foot">
@@ -150,6 +167,7 @@
             </div>
             <input id="title" type="text" maxlength="120" placeholder="Resume title (optional), e.g. Backend Engineer – Acme">
             <div class="templates" role="radiogroup" aria-label="Template">
+              <label class="tpl js-upload-tpl" hidden><input type="radio" name="template" value="upload"><span class="tpl-thumb upload">📄</span>My format</label>
               <label class="tpl"><input type="radio" name="template" value="classic" checked><span class="tpl-thumb classic"></span>Classic</label>
               <label class="tpl"><input type="radio" name="template" value="modern"><span class="tpl-thumb modern"></span>Modern</label>
               <label class="tpl"><input type="radio" name="template" value="minimal"><span class="tpl-thumb minimal"></span>Minimal</label>
@@ -165,6 +183,7 @@
       <section class="preview-col">
         <div class="toolbar no-print">
           <div class="seg" role="radiogroup" aria-label="Template">
+            <button data-tpl="upload" class="js-upload-tpl" hidden>My format</button>
             <button data-tpl="classic" class="active">Classic</button>
             <button data-tpl="modern">Modern</button>
             <button data-tpl="minimal">Minimal</button>
@@ -172,7 +191,8 @@
           <div class="toolbar-actions">
             <button id="regen-btn" class="btn ghost" disabled title="Generate again">↻ Regenerate</button>
             <button id="copy-btn" class="btn ghost" disabled>Copy</button>
-            <button id="print-btn" class="btn primary" disabled>Download PDF</button>
+            <button id="docx-btn" class="btn ghost" disabled title="Download as a Word document"><span class="btn-label">⬇ Word</span></button>
+            <button id="pdf-btn" class="btn primary" disabled title="Download as PDF"><span class="btn-label">⬇ PDF</span></button>
           </div>
         </div>
 
