@@ -58,17 +58,51 @@ jobs:
       - name: Apply database migrations
         if: steps.check.outputs.ready == 'true'
         run: |
-          supabase link --project-ref "$SUPABASE_PROJECT_REF"
-          supabase db push
+          # Runs a CLI command; on failure the tail of its output becomes a visible annotation.
+          run() {
+            label="$1"; shift
+            if "$@" > out.log 2>&1 < /dev/null; then code=0; else code=$?; fi
+            cat out.log
+            if [ $code -ne 0 ]; then
+              msg="$(tail -n 25 out.log | sed -e 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"
+              echo "::error title=${label} failed::${msg}"
+              exit $code
+            fi
+          }
+          run "supabase link" supabase link --project-ref "$SUPABASE_PROJECT_REF"
+          run "supabase db push" supabase db push --include-all
 
       - name: Set function secrets
         if: steps.check.outputs.ready == 'true' && env.LLM_API_KEY != ''
         run: |
+          # Runs a CLI command; on failure the tail of its output becomes a visible annotation.
+          run() {
+            label="$1"; shift
+            if "$@" > out.log 2>&1 < /dev/null; then code=0; else code=$?; fi
+            cat out.log
+            if [ $code -ne 0 ]; then
+              msg="$(tail -n 25 out.log | sed -e 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"
+              echo "::error title=${label} failed::${msg}"
+              exit $code
+            fi
+          }
           args=("LLM_API_KEY=$LLM_API_KEY")
           [ -n "$LLM_BASE_URL" ] && args+=("LLM_BASE_URL=$LLM_BASE_URL")
           [ -n "$LLM_MODEL" ] && args+=("LLM_MODEL=$LLM_MODEL")
-          supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" "${args[@]}"
+          run "supabase secrets set" supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" "${args[@]}"
 
       - name: Deploy edge function
         if: steps.check.outputs.ready == 'true'
-        run: supabase functions deploy generate-resume --project-ref "$SUPABASE_PROJECT_REF"
+        run: |
+          # Runs a CLI command; on failure the tail of its output becomes a visible annotation.
+          run() {
+            label="$1"; shift
+            if "$@" > out.log 2>&1 < /dev/null; then code=0; else code=$?; fi
+            cat out.log
+            if [ $code -ne 0 ]; then
+              msg="$(tail -n 25 out.log | sed -e 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"
+              echo "::error title=${label} failed::${msg}"
+              exit $code
+            fi
+          }
+          run "supabase functions deploy" supabase functions deploy generate-resume --project-ref "$SUPABASE_PROJECT_REF"
