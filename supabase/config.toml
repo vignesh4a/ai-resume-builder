@@ -1,7 +1,12 @@
 project_id = "ai-resume-builder"
 
 [auth]
-enable_anonymous_sign_ins = true
+enable_anonymous_sign_ins = false
+
+[auth.external.google]
+enabled = true
+client_id = "env(GOOGLE_CLIENT_ID)"
+secret = "env(GOOGLE_CLIENT_SECRET)"
 
 [functions.generate-resume]
 verify_jwt = true

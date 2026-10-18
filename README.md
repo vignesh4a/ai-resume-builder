@@ -1,6 +1,6 @@
 # AI Resume Builder
 
-Paste your background and a job requirement and get a resume tailored to that job. The resume is written by an **open-source LLM** (Meta Llama) and saved in an **open-source database** (Postgres on Supabase). Everything runs on free tiers.
+Sign in with Google, paste your background and a job requirement, and get a resume tailored to that job. The resume is written by an **open-source LLM** (Meta Llama) and saved in an **open-source database** (Postgres on Supabase). Everything runs on free tiers.
 
 **Live site:** https://vignesh4a.github.io/ai-resume-builder/
 
@@ -11,8 +11,9 @@ Browser (GitHub Pages, static HTML/JS)
    │  supabase-js (anon key + user JWT)
    ▼
 Supabase (free tier, open source)
-   ├── Auth: guest (anonymous) accounts, optional email magic link
-   ├── Postgres: profiles + resumes tables, protected by Row Level Security
+   ├── Auth: Sign in with Google (Gmail)
+   ├── Postgres: profiles (identity, saved inputs, login stats), login_events,
+   │             resumes — all protected by Row Level Security
    └── Edge Function "generate-resume"
           │  holds the LLM API key server-side
           ▼
@@ -34,16 +35,28 @@ Features:
 - Lets you edit the text in place before you download
 - Downloads a PDF through the browser's print dialog
 - Keeps a history of your resumes
-- Lets you start as a guest and add an email later
+- Landing page with Sign in with Google; every login is recorded (`login_events`, `profiles.login_count`)
+- Your background and job requirement drafts autosave to your account
+- Dashboard with stats, live progress while generating, toasts, searchable resume library
+- Keyboard shortcut: Ctrl/Cmd + Enter to generate
 
 ## One-time setup (about 10 minutes)
 
 ### 1. Create a free Supabase project
 1. Sign up at https://supabase.com and create a new project. Write down the **database password**.
-2. Go to **Authentication → Sign In / Providers**:
-   - Turn on **Allow anonymous sign-ins**
-   - Keep **Email** turned on
-3. Go to **Authentication → URL Configuration** and set **Site URL** to `https://vignesh4a.github.io/ai-resume-builder/`.
+2. Go to **Authentication → URL Configuration**:
+   - Set **Site URL** to `https://vignesh4a.github.io/ai-resume-builder/`.
+   - Add the same URL under **Redirect URLs**.
+3. Turn on **Sign in with Google**:
+   1. Open the [Google Cloud Console](https://console.cloud.google.com/) and create a project (it's free).
+   2. Go to **APIs & Services → OAuth consent screen**:
+      - Choose **External**.
+      - Enter an app name and your Gmail as the support email.
+      - Save, then **Publish app** so any Gmail user can sign in.
+   3. Go to **APIs & Services → Credentials → Create credentials → OAuth client ID** and choose **Web application**:
+      - Under **Authorized JavaScript origins**, add `https://vignesh4a.github.io`.
+      - Under **Authorized redirect URIs**, add `https://<your-project-ref>.supabase.co/auth/v1/callback`.
+   4. Copy the **Client ID** and **Client secret** into Supabase under **Authentication → Sign In / Providers → Google**, then click **Enable** and **Save**.
 4. Collect these values:
    - **Project ref** and **Project URL** (Project Settings → General / API)
    - **anon public key** (Project Settings → API Keys)

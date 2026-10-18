@@ -4,101 +4,207 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AI Resume Builder</title>
-  <meta name="description" content="Paste a job requirement and get a tailored resume instantly, written by open-source LLMs.">
+  <meta name="description" content="Sign in with Google, paste a job requirement and get a tailored resume instantly, written by open-source LLMs.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Source+Serif+4:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <script src="config.js"></script>
   <script type="module" src="app.js"></script>
 </head>
-<body>
-  <header class="topbar no-print">
-    <div class="brand">
-      <span class="logo" aria-hidden="true">R</span>
-      <span>AI Resume Builder</span>
-    </div>
-    <div class="account">
-      <span id="account-label" class="muted">Connecting…</span>
-      <button id="account-btn" class="btn ghost" hidden>Save with email</button>
-      <button id="signout-btn" class="btn ghost" hidden>Sign out</button>
-    </div>
-  </header>
+<body class="booting">
+  <!-- Shown while the session is being checked -->
+  <div id="boot" class="boot"><span class="spinner"></span></div>
 
-  <div id="setup-banner" class="banner no-print" hidden>
+  <div id="setup-banner" class="banner" hidden>
     This site is not connected to Supabase yet. Set the <code>SUPABASE_URL</code> and
     <code>SUPABASE_ANON_KEY</code> repository variables and re-run the deploy workflow (see README).
   </div>
 
-  <main class="layout">
-    <section class="panel no-print">
-      <form id="resume-form">
-        <label for="background">
-          <span class="label">1. About you</span>
-          <span class="hint">Paste your experience, education, skills, projects and contact details — an old resume or LinkedIn summary works. Saved for next time.</span>
-        </label>
-        <textarea id="background" rows="10" required minlength="30" maxlength="12000"
-          placeholder="Jane Doe · jane@email.com · Bengaluru&#10;Software Engineer at Acme (2021–present): built payment APIs in Java/Spring, cut latency 40%…&#10;B.Tech CSE, VIT 2021…"></textarea>
+  <!-- ================= Landing (signed out) ================= -->
+  <div id="landing" class="landing" hidden>
+    <header class="land-nav">
+      <div class="brand"><span class="logo" aria-hidden="true">R</span><span>AI Resume Builder</span></div>
+      <button class="btn ghost js-google">Sign in</button>
+    </header>
 
-        <label for="requirement">
-          <span class="label">2. Job requirement</span>
-          <span class="hint">Paste the job description you're applying for.</span>
-        </label>
-        <textarea id="requirement" rows="8" required minlength="20" maxlength="12000"
-          placeholder="We're hiring a Backend Engineer with 3+ years of Java, microservices, AWS…"></textarea>
-
-        <div class="row">
-          <label class="grow">
-            <span class="label small">Resume title (optional)</span>
-            <input id="title" type="text" maxlength="120" placeholder="Backend Engineer – Acme">
-          </label>
-          <label>
-            <span class="label small">Template</span>
-            <select id="template">
-              <option value="classic">Classic</option>
-              <option value="modern">Modern</option>
-            </select>
-          </label>
+    <section class="hero">
+      <div class="hero-copy">
+        <span class="pill">Free · Open-source AI · No credit card</span>
+        <h1>A resume tailored to <span class="grad">every job</span>, in seconds.</h1>
+        <p class="lead">Paste the job description, tell us about yourself once, and an open-source Llama model
+          writes an ATS-friendly resume that highlights exactly what the recruiter is looking for.</p>
+        <button class="btn google js-google">
+          <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+          Continue with Google
+        </button>
+        <p id="landing-error" class="status error" role="alert"></p>
+        <p class="muted small">We only use your Google name, email and photo to create your account.</p>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <div class="mock-paper">
+          <div class="mock-score"><span>92%</span><small>job match</small></div>
+          <div class="mock-line w60 thick"></div>
+          <div class="mock-line w40"></div>
+          <div class="mock-gap"></div>
+          <div class="mock-line w30 head"></div>
+          <div class="mock-line w90"></div><div class="mock-line w80"></div>
+          <div class="mock-gap"></div>
+          <div class="mock-line w30 head"></div>
+          <div class="mock-line w85"></div><div class="mock-line w75"></div><div class="mock-line w90"></div>
+          <div class="mock-chips"><span>Java</span><span>AWS</span><span>Kafka</span></div>
         </div>
-
-        <button id="generate-btn" class="btn primary" type="submit">Generate resume</button>
-        <p id="status" class="status" role="status"></p>
-      </form>
-
-      <div class="history">
-        <h2>My resumes</h2>
-        <ul id="history-list"><li class="muted">Nothing yet.</li></ul>
       </div>
     </section>
 
-    <section class="preview-col">
-      <div class="toolbar no-print">
-        <span class="muted">Preview — click any text to tweak it before downloading.</span>
-        <div class="toolbar-actions">
-          <button id="copy-btn" class="btn ghost" disabled>Copy text</button>
-          <button id="print-btn" class="btn" disabled>Download PDF</button>
-        </div>
+    <section class="how">
+      <h2>How it works</h2>
+      <div class="cards3">
+        <div class="card"><span class="num">1</span><h3>Sign in with Google</h3><p>One click. Your profile and every resume are saved to your account.</p></div>
+        <div class="card"><span class="num">2</span><h3>Paste the job</h3><p>Drop in any job description. We save your background so you only type it once.</p></div>
+        <div class="card"><span class="num">3</span><h3>Download &amp; apply</h3><p>Get a tailored resume, a match score and missing keywords, then download it as a PDF.</p></div>
       </div>
-
-      <div id="match" class="match no-print" hidden></div>
-
-      <article id="resume" class="resume classic">
-        <div class="empty">
-          <p>Your tailored resume will appear here.</p>
-        </div>
-      </article>
     </section>
-  </main>
 
-  <dialog id="email-dialog" class="no-print">
-    <form method="dialog" id="email-form">
-      <h3 id="email-title">Save your resumes with email</h3>
-      <p class="muted" id="email-hint">We'll email you a link. Your resumes then follow you to any device.</p>
-      <input id="email-input" type="email" required placeholder="you@example.com">
-      <div class="row end">
-        <button value="cancel" formnovalidate class="btn ghost">Cancel</button>
-        <button value="ok" class="btn primary">Send link</button>
+    <footer class="land-foot muted small">
+      Built with GitHub Pages, Supabase (open-source Postgres) and Meta Llama.
+    </footer>
+  </div>
+
+  <!-- ================= App (signed in) ================= -->
+  <div id="app" hidden>
+    <header class="topbar no-print">
+      <div class="brand"><span class="logo" aria-hidden="true">R</span><span class="hide-sm">AI Resume Builder</span></div>
+      <nav class="tabs" role="tablist">
+        <button class="tab active" data-tab="create" role="tab">Create</button>
+        <button class="tab" data-tab="library" role="tab">My resumes <span id="library-count" class="count">0</span></button>
+      </nav>
+      <div class="user-menu">
+        <button id="user-btn" class="avatar-btn" aria-haspopup="true" aria-expanded="false">
+          <img id="user-avatar" alt="" referrerpolicy="no-referrer">
+          <span id="user-initial" class="initial"></span>
+        </button>
+        <div id="user-pop" class="popover" hidden>
+          <p id="user-name" class="pop-name"></p>
+          <p id="user-email" class="muted small"></p>
+          <p id="user-logins" class="muted small"></p>
+          <button id="signout-btn" class="btn ghost full">Sign out</button>
+        </div>
       </div>
-    </form>
-  </dialog>
+    </header>
+
+    <div class="welcome no-print">
+      <div>
+        <h1 id="greeting">Welcome!</h1>
+        <p class="muted">Let's build a resume for your next role.</p>
+      </div>
+      <div class="stats">
+        <div class="stat"><span id="stat-count">0</span><small>resumes</small></div>
+        <div class="stat"><span id="stat-score">–</span><small>avg match</small></div>
+        <div class="stat"><span id="stat-best">–</span><small>best match</small></div>
+      </div>
+    </div>
+
+    <!-- Create tab -->
+    <main id="tab-create" class="layout">
+      <section class="panel no-print">
+        <form id="resume-form" novalidate>
+          <div class="step" data-step="1">
+            <div class="step-head">
+              <span class="step-num">1</span>
+              <div>
+                <h2>About you</h2>
+                <p class="hint">Experience, education, skills, projects and contact details. An old resume or LinkedIn "About" works.</p>
+              </div>
+            </div>
+            <textarea id="background" rows="9" maxlength="12000"
+              placeholder="Jane Doe · jane@email.com · Bengaluru&#10;Software Engineer at Acme (2021–present): built payment APIs in Java/Spring, cut latency 40%…&#10;B.Tech CSE, VIT 2021…"></textarea>
+            <div class="field-foot">
+              <button type="button" id="sample-btn" class="link small">Fill with an example</button>
+              <span><span id="save-state" class="muted small"></span> <span id="bg-count" class="muted small">0</span></span>
+            </div>
+          </div>
+
+          <div class="step" data-step="2">
+            <div class="step-head">
+              <span class="step-num">2</span>
+              <div>
+                <h2>Job requirement</h2>
+                <p class="hint">Paste the job description you're applying for.</p>
+              </div>
+            </div>
+            <textarea id="requirement" rows="7" maxlength="12000"
+              placeholder="We're hiring a Backend Engineer with 3+ years of Java, microservices, AWS…"></textarea>
+            <div class="field-foot">
+              <button type="button" id="paste-btn" class="link small">Paste from clipboard</button>
+              <span id="req-count" class="muted small">0</span>
+            </div>
+          </div>
+
+          <div class="step" data-step="3">
+            <div class="step-head">
+              <span class="step-num">3</span>
+              <div>
+                <h2>Generate</h2>
+                <p class="hint">Pick a style. You can switch it after generating.</p>
+              </div>
+            </div>
+            <input id="title" type="text" maxlength="120" placeholder="Resume title (optional), e.g. Backend Engineer – Acme">
+            <div class="templates" role="radiogroup" aria-label="Template">
+              <label class="tpl"><input type="radio" name="template" value="classic" checked><span class="tpl-thumb classic"></span>Classic</label>
+              <label class="tpl"><input type="radio" name="template" value="modern"><span class="tpl-thumb modern"></span>Modern</label>
+              <label class="tpl"><input type="radio" name="template" value="minimal"><span class="tpl-thumb minimal"></span>Minimal</label>
+            </div>
+            <button id="generate-btn" class="btn primary big" type="submit">
+              <span class="btn-label">✨ Generate my resume</span>
+            </button>
+            <p class="muted small center">Tip: press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to generate</p>
+          </div>
+        </form>
+      </section>
+
+      <section class="preview-col">
+        <div class="toolbar no-print">
+          <div class="seg" role="radiogroup" aria-label="Template">
+            <button data-tpl="classic" class="active">Classic</button>
+            <button data-tpl="modern">Modern</button>
+            <button data-tpl="minimal">Minimal</button>
+          </div>
+          <div class="toolbar-actions">
+            <button id="regen-btn" class="btn ghost" disabled title="Generate again">↻ Regenerate</button>
+            <button id="copy-btn" class="btn ghost" disabled>Copy</button>
+            <button id="print-btn" class="btn primary" disabled>Download PDF</button>
+          </div>
+        </div>
+
+        <div id="match" class="match no-print" hidden></div>
+
+        <div class="paper-wrap">
+          <div id="loading" class="loading no-print" hidden>
+            <div class="loader-ring"></div>
+            <p id="loading-msg">Reading the job requirement…</p>
+            <div class="progress"><span id="progress-bar"></span></div>
+          </div>
+          <article id="resume" class="resume classic">
+            <div class="empty">
+              <div class="empty-icon">📄</div>
+              <p><strong>Your tailored resume will appear here.</strong></p>
+              <p class="muted">Fill in steps 1 and 2, then hit Generate.</p>
+            </div>
+          </article>
+        </div>
+        <p class="muted small center no-print">Click any text on the resume to edit it before downloading.</p>
+      </section>
+    </main>
+
+    <!-- Library tab -->
+    <main id="tab-library" class="library" hidden>
+      <div class="library-head">
+        <input id="search" type="search" placeholder="Search your resumes…">
+      </div>
+      <div id="library-grid" class="grid"></div>
+    </main>
+  </div>
+
+  <div id="toasts" class="toasts no-print" aria-live="polite"></div>
 </body>
 </html>

@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
     });
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return json({ error: "Not signed in" }, 401);
+    if (!user || user.is_anonymous) return json({ error: "Please sign in with Google first." }, 401);
 
     const { background, requirement, title } = await req.json();
     if (typeof background !== "string" || typeof requirement !== "string" ||

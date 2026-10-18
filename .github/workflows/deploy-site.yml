@@ -26,9 +26,11 @@ jobs:
 
       - name: Write public Supabase config
         env:
-          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
         run: |
+          [ -z "$SUPABASE_URL" ] && echo "::warning::SUPABASE_URL variable is empty - the site will show a setup banner."
+          [ -z "$SUPABASE_ANON_KEY" ] && echo "::warning::SUPABASE_ANON_KEY variable is empty - the site will show a setup banner."
           cat > web/config.js <<EOF
           window.APP_CONFIG = {
             SUPABASE_URL: "${SUPABASE_URL}",
