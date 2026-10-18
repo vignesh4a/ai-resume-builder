@@ -321,7 +321,7 @@ export async function downloadDocx(model, style, filename) {
   }
 
   const doc = new Document({
-    creator: "AI Resume Builder",
+    creator: "CVCraft",
     title: filename,
     styles: {
       default: {

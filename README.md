@@ -1,8 +1,8 @@
-# AI Resume Builder
+# CVCraft – AI Resume Builder
 
 Sign in with Google, paste your background and a job requirement, and get a resume tailored to that job. The resume is written by an **open-source LLM** (default: gpt-oss-120b) (Meta Llama) and saved in an **open-source database** (Postgres on Supabase). Everything runs on free tiers.
 
-**Live site:** https://vignesh4a.github.io/ai-resume-builder/
+**Live site:** https://vignesh4a.github.io/cvcraft/
 
 ## How it works
 
@@ -49,7 +49,7 @@ Features:
 ### 1. Create a free Supabase project
 1. Sign up at https://supabase.com and create a new project. Write down the **database password**.
 2. Go to **Authentication → URL Configuration**:
-   - Set **Site URL** to `https://vignesh4a.github.io/ai-resume-builder/`.
+   - Set **Site URL** to `https://vignesh4a.github.io/cvcraft/`.
    - Add the same URL under **Redirect URLs**.
 3. Turn on **Sign in with Google**:
    1. Open the [Google Cloud Console](https://console.cloud.google.com/) and create a project (it's free).
