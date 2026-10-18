@@ -315,31 +315,51 @@ document.addEventListener("keydown", (e) => {
 function setTemplate(name) {
   if (name === "upload" && !(activeFormat || uploadFormat)) name = "classic";
   currentTemplate = name;
-  els.resume.classList.remove("classic", "modern", "minimal", "upload");
-  els.resume.classList.add(name);
-  applyUploadStyle();
+  applyStyle();
   $$(".seg button").forEach((b) => b.classList.toggle("active", b.dataset.tpl === name));
   $$('input[name="template"]').forEach((r) => (r.checked = r.value === name));
 }
 $$(".seg button").forEach((b) => b.addEventListener("click", () => setTemplate(b.dataset.tpl)));
 
-// Mirror the uploaded resume's look (font, sizes, colours, alignment) in the preview.
-function applyUploadStyle() {
+// Every template is a style object (see exporter.js); the preview reads it through
+// CSS variables and flag classes, and the PDF/Word exports read the same object.
+const STYLE_FLAGS = {
+  "f-center": (st) => st.nameAlign === "center",
+  "f-rule": (st) => st.headingRule,
+  "f-upper": (st) => st.headingUpper,
+  "f-title-upper": (st) => st.titleUpper,
+  "f-title-bold": (st) => st.titleBold,
+  "f-skills-table": (st) => st.skillsTable,
+  "f-pipe": (st) => st.roleLayout === "pipe",
+  "f-role-upper": (st) => st.roleUpper,
+  "f-dates-below": (st) => st.datesBelow,
+  "f-dates-italic": (st) => st.datesItalic,
+  "f-side-bar": (st) => st.sideBar,
+};
+
+function applyStyle() {
+  const st = resolveStyle(currentTemplate, activeFormat || uploadFormat);
   const r = els.resume.style;
-  if (currentTemplate !== "upload") {
-    for (const v of ["--u-font", "--u-size", "--u-name", "--u-head", "--u-accent", "--u-name-color", "--u-align", "--u-case", "--u-rule"]) r.removeProperty(v);
-    return;
-  }
-  const st = resolveStyle("upload", activeFormat || uploadFormat);
-  r.setProperty("--u-font", `"${st.font}", ${st.serif ? '"Times New Roman", Georgia, serif' : '"Carlito", Arial, sans-serif'}`);
-  r.setProperty("--u-size", `${st.bodySize}pt`);
-  r.setProperty("--u-name", `${st.nameSize}pt`);
-  r.setProperty("--u-head", `${st.headingSize}pt`);
-  r.setProperty("--u-accent", st.accent);
-  r.setProperty("--u-name-color", st.nameColor);
-  r.setProperty("--u-align", st.nameAlign);
-  r.setProperty("--u-case", st.headingUpper ? "uppercase" : "none");
-  r.setProperty("--u-rule", st.headingRule ? "1px solid" : "0 solid");
+  const css = {
+    "--r-font": `"${st.font}", ${st.serif ? '"Times New Roman", Georgia, serif' : '"Carlito", Arial, sans-serif'}`,
+    "--r-size": `${st.bodySize}pt`,
+    "--r-name-size": `${st.nameSize}pt`,
+    "--r-head-size": `${st.headingSize}pt`,
+    "--r-accent": st.accent,
+    "--r-name-color": st.nameColor,
+    "--r-title-color": st.titleColor,
+    "--r-text": st.textColor,
+    "--r-muted": st.mutedColor,
+    "--r-rule-color": st.ruleColor,
+    "--r-rule-width": `${st.ruleWidth}pt`,
+    "--r-shade": st.tableShade || "transparent",
+    "--r-label-color": st.skillLabelColor || st.textColor,
+    "--r-bullet": JSON.stringify(`${st.bulletChar} `),
+    "--r-bullet-color": st.bulletColor || st.textColor,
+    "--r-role-color": st.roleColor || st.textColor,
+  };
+  for (const [k, v] of Object.entries(css)) r.setProperty(k, v);
+  for (const [cls, test] of Object.entries(STYLE_FLAGS)) els.resume.classList.toggle(cls, !!test(st));
 }
 
 // ---------- Upload an existing resume ----------
@@ -524,9 +544,18 @@ function section(title, ...children) {
   return s;
 }
 
+// "Cloud Migration: moved 40 jobs to AWS" → bold lead-in + text.
+const LEAD_IN = /^([^:]{3,70}):\s+(\S[\s\S]*)$/;
+
 function bulletList(items) {
   const ul = el("ul");
-  for (const b of arr(items)) ul.append(el("li", null, str(b)));
+  for (const b of arr(items)) {
+    const li = el("li");
+    const m = LEAD_IN.exec(str(b));
+    if (m && !/https?$/i.test(m[1])) li.append(el("strong", "r-lead", `${m[1]}:`), document.createTextNode(` ${m[2]}`));
+    else li.textContent = str(b);
+    ul.append(li);
+  }
   return ul;
 }
 
@@ -543,14 +572,14 @@ const SECTION_BUILDERS = {
     if (!skills.length) return null;
     const list = el("div", "r-skills");
     for (const group of skills) {
-      const p = el("p");
+      const row = el("div", "r-skill-row");
       if (typeof group === "string") {
-        p.textContent = group;
+        row.append(el("span", "r-skill-items", group));
       } else {
-        if (group.category) p.append(el("strong", null, `${str(group.category)}: `));
-        p.append(document.createTextNode(arr(group.items).map(str).join(", ")));
+        if (group.category) row.append(el("span", "r-skill-label", str(group.category)));
+        row.append(el("span", "r-skill-items", arr(group.items).map(str).join(", ")));
       }
-      list.append(p);
+      list.append(row);
     }
     return section(h, list);
   },
@@ -560,8 +589,8 @@ const SECTION_BUILDERS = {
     return section(h, ...exp.map((job) => {
       const item = el("div", "r-item");
       const head = el("div", "r-item-head");
-      const left = el("div");
-      left.append(el("strong", null, str(job.role)));
+      const left = el("div", "r-title-line");
+      left.append(el("strong", "r-role", str(job.role)));
       const org = [job.company, job.location].map(str).filter(Boolean).join(" · ");
       if (org) left.append(el("span", "r-org", org));
       head.append(left, el("span", "r-dates", [job.start, job.end].map(str).filter(Boolean).join(" – ")));
@@ -575,7 +604,7 @@ const SECTION_BUILDERS = {
     return section(h, ...projects.map((p) => {
       const item = el("div", "r-item");
       const head = el("div", "r-item-head");
-      head.append(el("strong", null, str(p.name)));
+      head.append(el("strong", "r-role", str(p.name)));
       item.append(head);
       if (p.description) item.append(el("p", null, str(p.description)));
       item.append(bulletList(p.bullets));
@@ -588,8 +617,8 @@ const SECTION_BUILDERS = {
     return section(h, ...edu.map((e) => {
       const item = el("div", "r-item");
       const head = el("div", "r-item-head");
-      const left = el("div");
-      left.append(el("strong", null, str(e.degree)));
+      const left = el("div", "r-title-line");
+      left.append(el("strong", "r-degree", str(e.degree)));
       if (e.institution) left.append(el("span", "r-org", str(e.institution)));
       head.append(left, el("span", "r-dates", str(e.year)));
       item.append(head);

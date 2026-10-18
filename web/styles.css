@@ -283,6 +283,12 @@ textarea:focus, input:focus { outline: none; border-color: var(--accent); backgr
   background-position: 12% 10px, 50% 24px, 50% 33px, 50% 42px;
 }
 
+.tpl-thumb.executive {
+  background-image: linear-gradient(#0f172a, #0f172a), linear-gradient(#0e7490, #0e7490),
+    linear-gradient(#f1f5f9, #f1f5f9), linear-gradient(#f1f5f9, #f1f5f9), linear-gradient(#0e7490, #0e7490);
+  background-size: 50% 6px, 90% 2px, 90% 6px, 90% 6px, 45% 3px;
+  background-position: 50% 6px, 50% 18px, 50% 26px, 50% 35px, 50% 46px;
+}
 .tpl-thumb.upload { display: grid; place-items: center; background-image: none; font-size: 1.4rem; }
 
 /* ---------- Upload ---------- */
@@ -360,10 +366,10 @@ textarea:focus, input:focus { outline: none; border-color: var(--accent); backgr
 
 /* ---------- Resume paper ---------- */
 .resume {
-  background: #fff; color: #1c1e21;
+  background: #fff;
   width: 100%; max-width: 820px; min-height: 1000px; margin: 0 auto;
   padding: 48px 56px; border-radius: 6px; box-shadow: var(--shadow);
-  font-size: 10.5pt; line-height: 1.45; color-scheme: light;
+  line-height: 1.45; color-scheme: light;
 }
 .resume:focus { outline: none; }
 .resume.reveal > * { animation: rise 0.45s ease both; }
@@ -379,49 +385,63 @@ textarea:focus, input:focus { outline: none; border-color: var(--accent); backgr
 }
 .resume .empty p { margin: 4px 0; }
 .empty-icon { font-size: 2.6rem; margin-bottom: 8px; }
-.resume h1 { margin: 0; font-size: 24pt; line-height: 1.1; }
-.r-headline { margin: 4px 0 0; font-size: 12pt; color: #3b4048; }
-.r-contact { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 0 0; font-size: 9.5pt; color: #4b515a; }
+/* Every template sets these variables and f-* flag classes from its style object (app.js applyStyle). */
+.resume {
+  --r-font: "Source Serif 4", Georgia, serif; --r-size: 10.5pt; --r-name-size: 24pt; --r-head-size: 10.5pt;
+  --r-accent: #1c1e21; --r-name-color: #1c1e21; --r-title-color: #3b4048; --r-text: #1c1e21; --r-muted: #4b515a;
+  --r-rule-color: #c9ced6; --r-rule-width: 0.75pt; --r-shade: transparent; --r-label-color: #1c1e21;
+  --r-bullet: "• "; --r-bullet-color: #1c1e21; --r-role-color: #1c1e21;
+  font-family: var(--r-font); font-size: var(--r-size); color: var(--r-text);
+}
+.resume h1 { margin: 0; font-size: var(--r-name-size); line-height: 1.1; color: var(--r-name-color); }
+.r-headline { margin: 4px 0 0; font-size: calc(var(--r-size) + 1.5pt); color: var(--r-title-color); }
+.f-title-upper .r-headline { text-transform: uppercase; letter-spacing: 0.02em; }
+.f-title-bold .r-headline { font-weight: 700; }
+.r-contact { display: flex; flex-wrap: wrap; gap: 2px 0; margin: 6px 0 0; font-size: calc(var(--r-size) - 1pt); color: var(--r-muted); }
+.r-contact > * + *::before { content: "|"; margin: 0 8px; opacity: 0.7; }
 .r-contact a { color: inherit; }
+.f-center .r-header { text-align: center; }
+.f-center .r-contact { justify-content: center; }
+.f-side-bar .r-header { border-left: 4px solid var(--r-accent); padding-left: 14px; }
+
 .r-section { margin-top: 16px; }
 .r-section h2 {
-  font-size: 10.5pt; text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 6px;
-  padding-bottom: 3px; border-bottom: 1px solid #c9ced6;
+  font-size: var(--r-head-size); color: var(--r-accent); margin: 0 0 7px; padding-bottom: 3px; font-weight: 700;
 }
+.f-upper .r-section h2 { text-transform: uppercase; letter-spacing: 0.06em; }
+.f-rule .r-section h2 { border-bottom: var(--r-rule-width) solid var(--r-rule-color); }
 .r-section p { margin: 0 0 4px; }
-.r-section ul { margin: 2px 0 0; padding-left: 18px; }
-.r-section li { margin-bottom: 2px; }
+.r-section ul { margin: 2px 0 0; padding-left: 20px; list-style-type: var(--r-bullet); }
+.r-section li { margin-bottom: 3px; }
+.r-section li::marker { color: var(--r-bullet-color); font-weight: 700; }
+.r-lead { color: color-mix(in srgb, var(--r-text) 60%, #000); }
+
 .r-item { margin-bottom: 10px; break-inside: avoid; }
 .r-item-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
-.r-org { color: #4b515a; margin-left: 6px; }
-.r-org::before { content: "— "; }
-.r-dates { color: #4b515a; white-space: nowrap; font-size: 9.5pt; }
-.r-skills p { margin-bottom: 2px; }
+.r-role { color: var(--r-role-color); }
+.f-role-upper .r-role { text-transform: uppercase; }
+.r-org { color: var(--r-muted); }
+.r-org::before { content: " — "; }
+.f-pipe .r-org { color: color-mix(in srgb, var(--r-text) 60%, #000); font-weight: 700; }
+.f-pipe .r-org::before { content: " | "; }
+.r-dates { color: var(--r-muted); white-space: nowrap; font-size: calc(var(--r-size) - 1pt); }
+.f-dates-below .r-item-head { flex-direction: column; gap: 1px; align-items: flex-start; }
+.f-dates-below .r-item-head .r-dates { font-size: calc(var(--r-size) - 0.5pt); margin-bottom: 2px; }
+.f-dates-italic .r-dates { font-style: italic; }
 
-.resume.classic { font-family: "Source Serif 4", Georgia, serif; }
-.resume.classic .r-header { text-align: center; }
-.resume.classic .r-contact { justify-content: center; }
-
-.resume.modern { font-family: Inter, system-ui, sans-serif; }
-.resume.modern h1 { color: #1e3fb8; }
-.resume.modern .r-header { border-left: 4px solid #1e3fb8; padding-left: 14px; }
-.resume.modern .r-section h2 { color: #1e3fb8; border-bottom-color: #1e3fb8; }
-
-.resume.minimal { font-family: Inter, system-ui, sans-serif; }
-.resume.minimal h1 { font-weight: 600; letter-spacing: -0.01em; }
-.resume.minimal .r-section h2 {
-  border: 0; text-transform: none; letter-spacing: 0; font-size: 11.5pt; color: #6b7280; font-weight: 600;
+/* Skills: "Label: items" lines, or a shaded two-column table. */
+.r-skill-row { margin-bottom: 2px; }
+.r-skill-label { font-weight: 700; }
+.r-skill-label::after { content: ": "; }
+.f-skills-table .r-skills { display: grid; gap: 2px; }
+.f-skills-table .r-skill-row {
+  display: grid; grid-template-columns: 30% 1fr; margin: 0; background: var(--r-shade);
+  font-size: calc(var(--r-size) - 0.5pt);
 }
-
-/* "My format": values come from the uploaded resume (set as CSS variables in app.js). */
-.resume.upload { font-family: var(--u-font); font-size: var(--u-size); }
-.resume.upload h1 { font-size: var(--u-name); color: var(--u-name-color); }
-.resume.upload .r-header { text-align: var(--u-align); }
-.resume.upload .r-contact { justify-content: var(--u-align); }
-.resume.upload .r-section h2 {
-  font-size: var(--u-head); color: var(--u-accent); text-transform: var(--u-case);
-  border-bottom: var(--u-rule) color-mix(in srgb, var(--u-accent) 45%, #c9ced6);
-}
+.f-skills-table .r-skill-row > span { padding: 4px 8px; }
+.f-skills-table .r-skill-label { color: var(--r-label-color); }
+.f-skills-table .r-skill-label::before { content: "\2022\00a0\00a0"; }
+.f-skills-table .r-skill-label::after { content: none; }
 
 @media (max-width: 600px) {
   .resume { padding: 28px 20px; min-height: 0; }

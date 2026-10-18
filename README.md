@@ -104,6 +104,39 @@ Open **Actions** and run both workflows with **Run workflow**:
 
 After that, every push to `main` redeploys automatically.
 
+## Free short address: `cvcraft.pages.dev` (Cloudflare Pages)
+
+The site also deploys to Cloudflare Pages when two settings are present. Google sign-in redirects are updated automatically.
+
+1. Sign up free at https://dash.cloudflare.com/sign-up and verify your email.
+2. **Account ID:** open Workers & Pages; it's shown on the right, or in the dashboard URL after `dash.cloudflare.com/`.
+3. **API token:** go to My Profile → API Tokens → Create Token. Choose **Create Custom Token**, give it the permission
+   **Account → Cloudflare Pages → Edit**, then create it and copy it.
+4. In GitHub, go to Settings → Secrets and variables → Actions:
+   - Add **secret** `CLOUDFLARE_API_TOKEN` (the token).
+   - Add **variable** `CLOUDFLARE_ACCOUNT_ID` (the account ID).
+   - Optionally add **variable** `CLOUDFLARE_PROJECT` to use a name other than `cvcraft`.
+5. Run **Deploy website to GitHub Pages** from the Actions tab. The log shows "Live at https://cvcraft.pages.dev/".
+   If that name is taken, Cloudflare adds a suffix such as `cvcraft-4ab.pages.dev`; set `CLOUDFLARE_PROJECT` to another name to change it.
+
+## Templates and uploaded designs
+
+| Template | Look |
+|---|---|
+| **My format** | Mirrors your uploaded resume |
+| **Executive** | Teal rules under headings, shaded two-column skills table, coloured bullets with bold lead-ins, "ROLE \| Company" with italic dates |
+| Classic / Modern / Minimal | Serif centred, blue side bar, and clean minimal |
+
+When you upload a resume (DOCX or PDF), CVCraft detects these design elements and keeps them in the preview and in both downloads:
+- fonts, sizes and colours (name, title, headings, body and secondary text)
+- rules under headings, with their colour and thickness
+- shaded skills tables and their label colour
+- bullet character and colour, and bold lead-in phrases
+- "ROLE | Company" lines and dates on their own line in italics
+- section order and heading wording
+
+For PDFs, colours, shading and rules are read by rendering the page and sampling its pixels.
+
 ## Local development
 ```bash
 # Put your Supabase URL and anon key in web/config.js (don't commit them), then:

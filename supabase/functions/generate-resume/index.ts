@@ -57,6 +57,19 @@ function cleanSections(format: unknown): Section[] {
     .map((s) => ({ key: s.key.slice(0, 20), heading: s.heading.slice(0, 60) }));
 }
 
+// Writing-style hints that match the chosen template / uploaded design.
+function styleInstruction(template: unknown, format: unknown) {
+  const f = (format ?? {}) as { leadIns?: boolean; skillsTable?: boolean };
+  const hints: string[] = [];
+  if (template === "executive" || f.leadIns) {
+    hints.push('Start every experience, project and achievement bullet with a 2-5 word bold-worthy phrase followed by a colon, e.g. "Cloud Migration: Moved 40 Oracle jobs to AWS EMR, cutting runtime 35%."');
+  }
+  if (template === "executive" || f.skillsTable) {
+    hints.push('Group "skills" into 5-8 categories with short names (e.g. "Big Data Frameworks", "Cloud & Analytics"), each with a comma-friendly list of items.');
+  }
+  return hints.length ? `\n\nSTYLE:\n- ${hints.join("\n- ")}` : "";
+}
+
 function layoutInstruction(sections: Section[]) {
   if (!sections.length) return "";
   const list = sections.map((s, i) =>
@@ -101,7 +114,7 @@ async function pickFallbackModel(): Promise<string | null> {
   return ids[0] ?? null;
 }
 
-function chatRequest(model: string, jsonMode: boolean, background: string, requirement: string, sections: Section[]) {
+function chatRequest(model: string, jsonMode: boolean, background: string, requirement: string, sections: Section[], style: string) {
   return fetch(`${LLM_BASE_URL}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${LLM_API_KEY}` },
@@ -116,18 +129,18 @@ function chatRequest(model: string, jsonMode: boolean, background: string, requi
         { role: "system", content: SYSTEM_PROMPT },
         {
           role: "user",
-          content: `TARGET JOB REQUIREMENT:\n${requirement}\n\nCANDIDATE BACKGROUND:\n${background}${layoutInstruction(sections)}`,
+          content: `TARGET JOB REQUIREMENT:\n${requirement}\n\nCANDIDATE BACKGROUND:\n${background}${layoutInstruction(sections)}${style}`,
         },
       ],
     }),
   });
 }
 
-async function callLlm(background: string, requirement: string, sections: Section[]) {
+async function callLlm(background: string, requirement: string, sections: Section[], style = "") {
   let jsonMode = true;
   let switchedModel = false;
   for (let attempt = 0; attempt < 3; attempt++) {
-    const res = await chatRequest(activeModel, jsonMode, background, requirement, sections);
+    const res = await chatRequest(activeModel, jsonMode, background, requirement, sections, style);
     if (res.ok) {
       const data = await res.json();
       return extractJson(data.choices?.[0]?.message?.content ?? "");
@@ -184,7 +197,7 @@ Deno.serve(async (req) => {
       return json({ error: "Hourly limit reached. Please try again later." }, 429);
     }
 
-    const content = await callLlm(background, requirement, sections);
+    const content = await callLlm(background, requirement, sections, styleInstruction(template, format));
 
     const { data: saved, error } = await supabase
       .from("resumes")
